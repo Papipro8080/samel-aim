@@ -22,8 +22,7 @@ jobs:
 
           static int   g_aimOn = 0;
           static float g_fov   = 180.0f;
-          static int   g_ready = 0;
-typedef void *(*fn_domain_get)(void);
+          static int   g_ready = 0; typedef void *(*fn_domain_get)(void);
           typedef void *(*fn_asm_open)(void *, const char *);
           typedef void *(*fn_image)(void *);
           typedef void *(*fn_class_from_name)(void *, const char *, const char *);
