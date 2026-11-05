@@ -1,0 +1,226 @@
+#import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
+#import <dlfcn.h>
+#import <math.h>
+
+typedef struct { float x, y, z; } Vec3;
+
+static int   g_aimOn = 0;
+static float g_fov   = 180.0f;
+static int   g_ready = 0;
+
+typedef void *(*fn_domain_get)(void);
+typedef void *(*fn_asm_open)(void *, const char *);
+typedef void *(*fn_image)(void *);
+typedef void *(*fn_class_from_name)(void *, const char *, const char *);
+typedef void *(*fn_class_get_type)(void *);
+typedef void *(*fn_class_get_field)(void *, const char *);
+typedef void (*fn_field_static_get)(void *, void *);
+typedef void *(*fn_class_get_method)(void *, const char *, int);
+typedef void *(*fn_invoke)(void *, void *, void **, void **);
+typedef void *(*fn_obj_class)(void *);
+typedef int  (*fn_assignable)(void *, void *);
+
+static fn_domain_get p_domain_get;
+static fn_asm_open p_asm_open;
+static fn_image p_image;
+static fn_class_from_name p_class_from_name;
+static fn_class_get_type p_class_get_type;
+static fn_class_get_field p_class_get_field;
+static fn_field_static_get p_field_static_get;
+static fn_class_get_method p_class_get_method;
+static fn_invoke p_invoke;
+static fn_obj_class p_obj_class;
+static fn_assignable p_assignable;
+
+static void *GameFacadeK, *MatchGameK, *PlayerK, *AEK, *AnimatorK, *CameraK, *TransformK, *ComponentK, *CCMK;
+static void *F_CurrentGame, *F_Replication;
+static void *M_IsDead, *M_GetDamagePos, *M_GetBoneTransform, *M_GetComponent;
+static void *M_GetGameCamera, *M_GetTransform, *M_GetPosition, *M_LookAt, *M_W2S;static void resolve_all(void) {
+    void *h = RTLD_DEFAULT;
+    p_domain_get = dlsym(h, "il2cpp_domain_get");
+    p_asm_open = dlsym(h, "il2cpp_domain_assembly_open");
+    p_image = dlsym(h, "il2cpp_assembly_get_image");
+    p_class_from_name = dlsym(h, "il2cpp_class_from_name");
+    p_class_get_type = dlsym(h, "il2cpp_class_get_type");
+    p_class_get_field = dlsym(h, "il2cpp_class_get_field_from_name");
+    p_field_static_get = dlsym(h, "il2cpp_field_static_get_value");
+    p_class_get_method = dlsym(h, "il2cpp_class_get_method_from_name");
+    p_invoke = dlsym(h, "il2cpp_runtime_invoke");
+    p_obj_class = dlsym(h, "il2cpp_object_get_class");
+    p_assignable = dlsym(h, "il2cpp_class_is_assignable_from");
+
+    void *dom = p_domain_get();
+    void *img = p_image(p_asm_open(dom, "Assembly-CSharp"));
+    void *uimg = p_image(p_asm_open(dom, "UnityEngine.CoreModule"));
+
+    GameFacadeK = p_class_from_name(img, "COW", "GameFacade");
+    MatchGameK  = p_class_from_name(img, "COW.GamePlay", "MatchGame");
+    PlayerK     = p_class_from_name(img, "COW.GamePlay", "Player");
+    AEK         = p_class_from_name(img, "COW.GamePlay", "AttackableEntity");
+    CCMK        = p_class_from_name(img, "COW.GamePlay", "CameraControllerManager");
+    AnimatorK   = p_class_from_name(uimg, "UnityEngine", "Animator");
+    CameraK     = p_class_from_name(uimg, "UnityEngine", "Camera");
+    TransformK  = p_class_from_name(uimg, "UnityEngine", "Transform");
+    ComponentK  = p_class_from_name(uimg, "UnityEngine", "Component");
+
+    if (!GameFacadeK || !MatchGameK || !PlayerK || !AEK || !ComponentK) { NSLog(@"[aim] clases no encontradas"); return; }
+
+    F_CurrentGame = p_class_get_field(GameFacadeK, "CurrentGame");
+    F_Replication = p_class_get_field(MatchGameK, "m_ReplicationEntitis");
+
+    M_IsDead = p_class_get_method(AEK, "get_IsDead", 0);
+    M_GetDamagePos = p_class_get_method(AEK, "GetAttackableCenterWS", 0);
+    M_GetBoneTransform = p_class_get_method(AnimatorK, "GetBoneTransform", 1);
+    M_GetComponent = p_class_get_method(ComponentK, "GetComponent", 1);
+    M_GetGameCamera = p_class_get_method(CCMK, "get_GameCamera", 0);
+    M_GetTransform = p_class_get_method(ComponentK, "get_transform", 0);
+    M_GetPosition = p_class_get_method(TransformK, "get_position", 0);
+    M_LookAt = p_class_get_method(TransformK, "LookAt", 1);
+    M_W2S = p_class_get_method(CameraK, "WorldToScreenPoint", 1);
+
+    if (!M_IsDead || !M_GetGameCamera || !M_LookAt || !M_GetTransform) { NSLog(@"[aim] metodos no resueltos"); return; }
+    g_ready = 1;
+    NSLog(@"[aim] listo");
+}
+
+static void *get_static(void *field) {
+    void *out = NULL;
+    p_field_static_get(field, &out);
+    return out;
+}
+
+static void *dict_val(void *dict, int i) {
+    void *entries = *(void **)((char *)dict + 0x18);
+    return *(void **)((char *)entries + 0x20 + i * 0x18 + 0x10);
+}
+
+static Vec3 vec3_of(void *m, void *obj) {
+    Vec3 r = {0, 0, 0};
+    void *p = p_invoke(m, obj, NULL, NULL);
+    if (p) r = *(Vec3 *)p;
+    return r;
+}
+
+static void tick(void) {
+    if (!g_aimOn || !g_ready) return;
+
+    void *game = get_static(F_CurrentGame);
+    if (!game || !p_assignable(MatchGameK, p_obj_class(game))) return;
+
+    void *dict = *(void **)((char *)game + 0x98);
+    void *mgr  = *(void **)((char *)game + 0xA8);
+    if (!dict || !mgr) return;
+    int n = *(int *)((char *)dict + 0x20);
+    if (n < 1) return;
+
+    void *cam = p_invoke(M_GetGameCamera, mgr, NULL, NULL);
+    if (!cam) return;
+    void *ctr = p_invoke(M_GetTransform, cam, NULL, NULL);
+    if (!ctr) return;
+    Vec3 cpos = vec3_of(M_GetPosition, ctr);
+
+    void *local = NULL;
+    float nearest = 1e9f;
+    for (int i = 0; i < n; i++) {
+        void *p = dict_val(dict, i);
+        if (!p || !p_assignable(PlayerK, p_obj_class(p))) continue;
+        Vec3 c = vec3_of(M_GetDamagePos, p);
+        float dx = c.x - cpos.x, dy = c.y - cpos.y, dz = c.z - cpos.z;
+        float d = sqrtf(dx*dx + dy*dy + dz*dz);
+        if (d < nearest) { nearest = d; local = p; }
+    }
+    if (!local) return;
+
+    int team = *(int *)((char *)local + 0x114);
+    void *atype = p_class_get_type(AnimatorK);
+    void *targs[1] = { &atype };
+    void *anim = p_invoke(M_GetComponent, local, targs, NULL);
+
+    void *best = NULL;
+    float bestD = 1e9f;
+    CGSize sz = UIScreen.mainScreen.bounds.size;
+
+    for (int i = 0; i < n; i++) {
+        void *p = dict_val(dict, i);
+        if (!p || p == local || !p_assignable(PlayerK, p_obj_class(p))) continue;
+        void *dead = p_invoke(M_IsDead, p, NULL, NULL);
+        if (dead && *(unsigned char *)((char *)dead + 0x10)) continue;
+        if (*(int *)((char *)p + 0x114) == team) continue;
+
+        Vec3 aim = {0, 0, 0};
+        if (anim) {
+            int bone = 10;
+            void *ba[1] = { &bone };
+            void *t = p_invoke(M_GetBoneTransform, anim, ba, NULL);
+            if (t) {
+                void *tp = p_invoke(M_GetPosition, t, NULL, NULL);
+                if (tp) aim = *(Vec3 *)tp;
+            }
+        }
+        if (aim.x == 0 && aim.y == 0 && aim.z == 0) aim = vec3_of(M_GetDamagePos, p);
+
+        void *wa[1] = { &aim };
+        void *sp = p_invoke(M_W2S, cam, wa, NULL);
+        if (!sp) continue;
+        Vec3 s = *(Vec3 *)sp;
+        if (s.z <= 0) continue;
+
+        float dx = s.x - sz.width * 0.5f, dy = s.y - sz.height * 0.5f;
+        float d = sqrtf(dx*dx + dy*dy);
+        if (d < bestD) { bestD = d; best = p; }
+    }
+
+    if (!best || bestD > g_fov) return;
+    Vec3 aim = vec3_of(M_GetDamagePos, best);
+    void *aa[1] = { &aim };
+    p_invoke(M_LookAt, ctr, aa, NULL);
+}
+
+@interface FFWin : UIWindow @end
+@implementation FFWin
+- (UIView *)hitTest:(CGPoint)p withEvent:(UIEvent *)e {
+    UIView *v = [super hitTest:p withEvent:e];
+    return (v == self.rootViewController.view) ? nil : v;
+}
+@end
+
+@interface FFBtn : UIButton @end
+@implementation FFBtn
+- (void)toggle {
+    g_aimOn = !g_aimOn;
+    self.backgroundColor = g_aimOn
+        ? [UIColor colorWithRed:0 green:0.7 blue:0.2 alpha:0.8]
+        : [UIColor colorWithWhite:0 alpha:0.55];
+}
+- (void)drag:(UIPanGestureRecognizer *)g {
+    CGPoint t = [g translationInView:self.superview];
+    self.center = CGPointMake(self.center.x + t.x, self.center.y + t.y);
+    [g setTranslation:CGPointZero inView:self.superview];
+}
+@end
+
+__attribute__((constructor)) static void boot(void) {
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 8 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        resolve_all();
+        if (!g_ready) return;
+
+        FFWin *w = [[FFWin alloc] initWithFrame:UIScreen.mainScreen.bounds];
+        w.windowLevel = CGFLOAT_MAX;
+        w.backgroundColor = UIColor.clearColor;
+        w.rootViewController = [UIViewController new];
+        w.hidden = NO;
+
+        FFBtn *b = [FFBtn buttonWithType:UIButtonTypeSystem];
+        b.frame = CGRectMake(20, 140, 60, 60);
+        b.backgroundColor = [UIColor colorWithWhite:0 alpha:0.55];
+        b.layer.cornerRadius = 30;
+        [b setTitle:@"FF" forState:UIControlStateNormal];
+        [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+        [b addTarget:b action:@selector(toggle) forControlEvents:UIControlEventTouchUpInside];
+        [b addGestureRecognizer:[[UIPanGestureRecognizer alloc] initWithTarget:b action:@selector(drag:)]];
+        [w.rootViewController.view addSubview:b];
+
+        [NSTimer scheduledTimerWithTimeInterval:1.0/60.0 repeats:YES block:^(NSTimer *t) { tick(); }];
+    });
+}
