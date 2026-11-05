@@ -21,8 +21,15 @@ jobs:
           set +e
           CMD="dotnet Il2CppDumper.dll $GITHUB_WORKSPACE/freefireth $GITHUB_WORKSPACE/global-metadata.dat $GITHUB_WORKSPACE/dump"
           printf '\n\n\n\n' | timeout 300 script -qec "$CMD" /dev/null > out.txt 2>&1
+          cd "$GITHUB_WORKSPACE"
+          SRC=$(find "$GITHUB_WORKSPACE" -name dump.cs | head -1)
+          mkdir -p "$GITHUB_WORKSPACE/dump"
+          if [ -n "$SRC" ]; then cp "$SRC" "$GITHUB_WORKSPACE/dump/dump.cs"; fi
           D="$GITHUB_WORKSPACE/dump/dump.cs"
           {
+            echo "### 0. localizado"
+            echo "$SRC"
+            ls -la "$D"
             echo "### A. m_Players"
             grep -n "m_Players" "$D" | head -20
             echo "### B. m_LocalPlayer"
