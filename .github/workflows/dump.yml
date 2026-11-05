@@ -2,12 +2,12 @@ name: dump
 on: workflow_dispatch
 jobs:
   dump:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 7.0.x
+          dotnet-version: 8.0.x
       - name: bajar binario
         run: |
           curl -fL -o freefireth "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth"
@@ -15,16 +15,45 @@ jobs:
           file freefireth
           head -c 4 freefireth | xxd
       - name: comprobar cifrado
-        run: otool -l freefireth | grep -A4 LC_ENCRYPTION_INFO || echo "SIN SEGMENTO DE CIFRADO"
+        run: |
+          cat > check.py <<'PYEOF'
+          import struct, sys
+          data = open(sys.argv[1], "rb").read()
+          def scan(off, tag):
+              magic = struct.unpack(">I", data[off:off+4])[0]
+              if magic not in (0xfeedfacf, 0xfeedface):
+                  print(tag, "no es Mach-O"); return
+              is64 = magic == 0xfeedfacf
+              ncmds = struct.unpack("<I", data[off+16:off+20])[0]
+              p = off + (32 if is64 else 28)
+              for _ in range(ncmds):
+                  cmd, size = struct.unpack("<II", data[p:p+8])
+                  if cmd in (0x21, 0x2c):
+                      print(tag, "cryptid =", struct.unpack("<I", data[p+16:p+20])[0]); return
+                  p += size
+              print(tag, "sin LC_ENCRYPTION_INFO")
+          m = struct.unpack(">I", data[:4])[0]
+          if m in (0xcafebabe, 0xcafebabf):
+              for i in range(struct.unpack(">I", data[4:8])[0]):
+                  b = 8 + i*20
+                  scan(struct.unpack(">I", data[b+8:b+12])[0], "arch%d" % i)
+          else:
+              scan(0, "thin")
+          PYEOF
+          python3 check.py freefireth
       - name: dumper
         env:
-          DOTNET_EnableWriteXorExecute: 0
+          DOTNET_ROLL_FORWARD: Major
         run: |
           curl -fL -o i2c.zip "https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net7-v6.7.46.zip"
           unzip -o i2c.zip -d i2c
           ls -la i2c
           cd i2c
-          dotnet Il2CppDumper.dll "$GITHUB_WORKSPACE/freefireth" "$GITHUB_WORKSPACE/global-metadata.dat" "$GITHUB_WORKSPACE/dump"
+          set +e
+          dotnet Il2CppDumper.dll "$GITHUB_WORKSPACE/freefireth" "$GITHUB_WORKSPACE/global-metadata.dat" "$GITHUB_WORKSPACE/dump" 2> err.txt
+          echo "EXIT=$?"
+          cat err.txt
+          ls -la "$GITHUB_WORKSPACE/dump" || true
       - uses: actions/upload-artifact@v4
         with:
           name: dump
