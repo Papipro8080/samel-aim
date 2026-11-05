@@ -38,17 +38,17 @@ static void *F_CurrentGame, *F_Replication;
 static void *M_IsDead, *M_GetDamagePos, *M_GetBoneTransform, *M_GetComponent;
 static void *M_GetGameCamera, *M_GetTransform, *M_GetPosition, *M_LookAt, *M_W2S;static void resolve_all(void) {
     void *h = RTLD_DEFAULT;
-    p_domain_get = dlsym(h, "il2cpp_domain_get");
-    p_asm_open = dlsym(h, "il2cpp_domain_assembly_open");
-    p_image = dlsym(h, "il2cpp_assembly_get_image");
-    p_class_from_name = dlsym(h, "il2cpp_class_from_name");
-    p_class_get_type = dlsym(h, "il2cpp_class_get_type");
-    p_class_get_field = dlsym(h, "il2cpp_class_get_field_from_name");
-    p_field_static_get = dlsym(h, "il2cpp_field_static_get_value");
-    p_class_get_method = dlsym(h, "il2cpp_class_get_method_from_name");
-    p_invoke = dlsym(h, "il2cpp_runtime_invoke");
-    p_obj_class = dlsym(h, "il2cpp_object_get_class");
-    p_assignable = dlsym(h, "il2cpp_class_is_assignable_from");
+    p_domain_get       = (fn_domain_get) dlsym(h, "il2cpp_domain_get");
+    p_asm_open         = (fn_asm_open) dlsym(h, "il2cpp_domain_assembly_open");
+    p_image            = (fn_image) dlsym(h, "il2cpp_assembly_get_image");
+    p_class_from_name  = (fn_class_from_name) dlsym(h, "il2cpp_class_from_name");
+    p_class_get_type   = (fn_class_get_type) dlsym(h, "il2cpp_class_get_type");
+    p_class_get_field  = (fn_class_get_field) dlsym(h, "il2cpp_class_get_field_from_name");
+    p_field_static_get = (fn_field_static_get) dlsym(h, "il2cpp_field_static_get_value");
+    p_class_get_method = (fn_class_get_method) dlsym(h, "il2cpp_class_get_method_from_name");
+    p_invoke           = (fn_invoke) dlsym(h, "il2cpp_runtime_invoke");
+    p_obj_class        = (fn_obj_class) dlsym(h, "il2cpp_object_get_class");
+    p_assignable       = (fn_assignable) dlsym(h, "il2cpp_class_is_assignable_from");
 
     void *dom = p_domain_get();
     void *img = p_image(p_asm_open(dom, "Assembly-CSharp"));
