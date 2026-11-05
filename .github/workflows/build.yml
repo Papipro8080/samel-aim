@@ -3,16 +3,17 @@ on: workflow_dispatch
 jobs:
   build:
     runs-on: macos-14
+    env:
+      THEOS: /Users/runner/theos
     steps:
       - uses: actions/checkout@v4
       - run: |
-          git clone --recursive https://github.com/theos/theos.git "$HOME/theos"
-          mkdir -p "$HOME/theos/sdks"
-          ln -s "$(xcrun --sdk iphoneos --show-sdk-path)" "$HOME/theos/sdks/iPhoneOS.sdk"
+          git clone --recursive https://github.com/theos/theos.git "$THEOS"
+          mkdir -p "$THEOS/sdks"
+          ln -s "$(xcrun --sdk iphoneos --show-sdk-path)" "$THEOS/sdks/iPhoneOS.sdk"
       - run: printf 'ARCHS = arm64\nTARGET = iphone:clang:latest:15.0\ninclude $(THEOS)/makefiles/common.mk\n\nLIBRARY_NAME = aim\naim_FILES = aim.xm\naim_FRAMEWORKS = UIKit Foundation QuartzCore\naim_CFLAGS = -fobjc-arc\ninclude $(THEOS)/makefiles/library.mk\n' > Makefile
+      - run: brew install ldid
       - run: make
-        env:
-          THEOS: /Users/runner/theos
       - run: find .theos -name "*.dylib" -exec lipo -info {} \;
       - uses: actions/upload-artifact@v4
         with:
