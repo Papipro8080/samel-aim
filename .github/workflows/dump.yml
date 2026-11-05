@@ -17,14 +17,15 @@ jobs:
       - name: comprobar cifrado
         run: otool -l freefireth | grep -A4 LC_ENCRYPTION_INFO || echo "SIN SEGMENTO DE CIFRADO"
       - name: dumper
+        env:
+          DOTNET_EnableWriteXorExecute: 0
         run: |
           curl -fL -o i2c.zip "https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net7-v6.7.46.zip"
           unzip -o i2c.zip -d i2c
           ls -la i2c
-          dotnet i2c/Il2CppDumper.dll freefireth global-metadata.dat dump
+          cd i2c
+          dotnet Il2CppDumper.dll "$GITHUB_WORKSPACE/freefireth" "$GITHUB_WORKSPACE/global-metadata.dat" "$GITHUB_WORKSPACE/dump"
       - uses: actions/upload-artifact@v4
         with:
           name: dump
           path: dump/
-
-      
