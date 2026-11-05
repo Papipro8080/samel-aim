@@ -12,8 +12,7 @@ jobs:
         run: |
           curl -fL -o freefireth "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth"
           ls -la freefireth global-metadata.dat
-          file freefireth
-          head -c 4 freefireth | xxd
+          { echo "### fichero"; file freefireth; } >> "$GITHUB_STEP_SUMMARY"
       - name: comprobar cifrado
         run: |
           cat > check.py <<'PYEOF'
@@ -40,7 +39,7 @@ jobs:
           else:
               scan(0, "thin")
           PYEOF
-          python3 check.py freefireth
+          { echo "### cifrado"; python3 check.py freefireth; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: dumper
         env:
           DOTNET_ROLL_FORWARD: Major
@@ -51,9 +50,18 @@ jobs:
           cd i2c
           set +e
           dotnet Il2CppDumper.dll "$GITHUB_WORKSPACE/freefireth" "$GITHUB_WORKSPACE/global-metadata.dat" "$GITHUB_WORKSPACE/dump" 2> err.txt
-          echo "EXIT=$?"
-          cat err.txt
-          ls -la "$GITHUB_WORKSPACE/dump" || true
+          CODE=$?
+          {
+            echo "### dumper"
+            echo "EXIT=$CODE"
+            echo "--- stdout/stderr ---"
+            head -80 err.txt
+            echo "--- contenido de dump ---"
+            ls -la "$GITHUB_WORKSPACE/dump" 2>&1
+            echo "--- runtimes ---"
+            dotnet --list-runtimes
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: dump
