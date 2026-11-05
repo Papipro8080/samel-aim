@@ -10,10 +10,9 @@ jobs:
           dotnet-version: 8.0.x
       - name: bajar binario
         run: |
-          curl -L -o bin.zip "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth.zip"
-          unzip -o bin.zip
-          ls -la
-          ls -la global-metadata.dat
+          curl -L -o freefireth "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth"
+          ls -la freefireth global-metadata.dat
+          file freefireth
       - name: comprobar cifrado
         run: otool -l freefireth | grep -A4 LC_ENCRYPTION_INFO || echo "SIN SEGMENTO DE CIFRADO"
       - name: dumper
