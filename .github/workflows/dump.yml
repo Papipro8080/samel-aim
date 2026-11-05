@@ -12,7 +12,6 @@ jobs:
         run: |
           curl -fL -o freefireth "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth"
           ls -la freefireth global-metadata.dat
-          { echo "### fichero"; file freefireth; } >> "$GITHUB_STEP_SUMMARY"
       - name: comprobar cifrado
         run: |
           cat > check.py <<'PYEOF'
@@ -20,9 +19,9 @@ jobs:
           data = open(sys.argv[1], "rb").read()
           def scan(off, tag):
               magic = struct.unpack(">I", data[off:off+4])[0]
-              if magic not in (0xfeedfacf, 0xfeedface):
+              if magic not in (0xcffaedfe, 0xcefaedfe):
                   print(tag, "no es Mach-O"); return
-              is64 = magic == 0xfeedfacf
+              is64 = magic == 0xcffaedfe
               ncmds = struct.unpack("<I", data[off+16:off+20])[0]
               p = off + (32 if is64 else 28)
               for _ in range(ncmds):
@@ -46,20 +45,18 @@ jobs:
         run: |
           curl -fL -o i2c.zip "https://github.com/Perfare/Il2CppDumper/releases/download/v6.7.46/Il2CppDumper-net7-v6.7.46.zip"
           unzip -o i2c.zip -d i2c
-          ls -la i2c
           cd i2c
           set +e
-          dotnet Il2CppDumper.dll "$GITHUB_WORKSPACE/freefireth" "$GITHUB_WORKSPACE/global-metadata.dat" "$GITHUB_WORKSPACE/dump" 2> err.txt
+          CMD="dotnet Il2CppDumper.dll $GITHUB_WORKSPACE/freefireth $GITHUB_WORKSPACE/global-metadata.dat $GITHUB_WORKSPACE/dump"
+          printf '\n\n\n\n' | timeout 300 script -qec "$CMD" /dev/null > out.txt 2>&1
           CODE=$?
           {
             echo "### dumper"
             echo "EXIT=$CODE"
-            echo "--- stdout/stderr ---"
-            head -80 err.txt
+            echo "--- salida completa ---"
+            head -120 out.txt
             echo "--- contenido de dump ---"
             ls -la "$GITHUB_WORKSPACE/dump" 2>&1
-            echo "--- runtimes ---"
-            dotnet --list-runtimes
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@v4
