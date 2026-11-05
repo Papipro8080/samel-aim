@@ -25,25 +25,24 @@ jobs:
           cp "$(find "$GITHUB_WORKSPACE" -name dump.cs | head -1)" dump/dump.cs
           D="$GITHUB_WORKSPACE/dump/dump.cs"
           {
-            echo "### 1. COWGameBase"
-            sed -n '417825,417950p' "$D"
-            echo "### 2. MatchGame"
-            sed -n '419061,419300p' "$D"
-            echo "### 3. metodos GetPlayer / PlayerManager"
-            grep -nE "GetPlayer[A-Za-z]*\(|PlayerManager|m_PlayerDict|m_PlayerMap|m_EntityList|m_Entitys" "$D" | head -40
-            echo "### 4. contenedores de AttackableEntity"
-            grep -nE "List<AttackableEntity>|Dictionary<[^>]*AttackableEntity" "$D" | head -20
-            echo "### 5. AttackableEntity"
-            sed -n '422760,422850p' "$D"
-            echo "### 6. GINHBFJPFBP (m_AimAssist)"
-            awk '/class GINHBFJPFBP /{f=1;c=0} f&&c<80{print;c++}' "$D"
-            echo "### 7. EAimAssist"
-            awk '/class EAimAssist /{f=1;c=0} f&&c<80{print;c++}' "$D"
-            echo "### 8. HasHeuristicTarget / GetHeuristicTarget"
-            sed -n '471055,471080p' "$D"
-            sed -n '473455,473485p' "$D"
-            echo "### 9. vida y estado"
-            grep -nE "m_HP|GetHP|get_HP|IsDead|get_IsDead|IsAlive" "$D" | head -30
+            echo "### 1. ArenaPlayerManager"
+            sed -n '393178,393300p' "$D"
+            echo "### 2. metodos que devuelven listas de jugadores"
+            grep -nE "GetAllPlayer|GetPlayers\(|GetPlayerList|GetAlivePlayer|GetEnemyPlayer" "$D" | head -30
+            echo "### 3. Player.GetPlayer abstracto"
+            sed -n '477800,477840p' "$D"
+            echo "### 4. GetPlayer concreto"
+            sed -n '483650,483700p' "$D"
+            echo "### 5. CurrentGame"
+            grep -n "CurrentGame" "$D" | head -20
+            echo "### 6. m_ReplicationEntitis y GetRepEntity"
+            grep -n "m_ReplicationEntitis\|GetRepEntity\|RegisterRepEntity" "$D" | head -20
+            echo "### 7. clase con m_EntityDic"
+            sed -n '450700,450830p' "$D"
+            echo "### 8. GINHBFJPFBP"
+            sed -n "$(grep -n 'class GINHBFJPFBP' "$D" | head -1 | cut -d: -f1),+70p" "$D"
+            echo "### 9. EAimAssist"
+            sed -n "$(grep -n 'class EAimAssist' "$D" | head -1 | cut -d: -f1),+70p" "$D"
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@v4
