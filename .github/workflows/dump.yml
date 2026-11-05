@@ -12,33 +12,6 @@ jobs:
         run: |
           curl -fL -o freefireth "https://github.com/Papipro8080/samel-aim/releases/download/v1/freefireth"
           ls -la freefireth global-metadata.dat
-      - name: comprobar cifrado
-        run: |
-          cat > check.py <<'PYEOF'
-          import struct, sys
-          data = open(sys.argv[1], "rb").read()
-          def scan(off, tag):
-              magic = struct.unpack(">I", data[off:off+4])[0]
-              if magic not in (0xcffaedfe, 0xcefaedfe):
-                  print(tag, "no es Mach-O"); return
-              is64 = magic == 0xcffaedfe
-              ncmds = struct.unpack("<I", data[off+16:off+20])[0]
-              p = off + (32 if is64 else 28)
-              for _ in range(ncmds):
-                  cmd, size = struct.unpack("<II", data[p:p+8])
-                  if cmd in (0x21, 0x2c):
-                      print(tag, "cryptid =", struct.unpack("<I", data[p+16:p+20])[0]); return
-                  p += size
-              print(tag, "sin LC_ENCRYPTION_INFO")
-          m = struct.unpack(">I", data[:4])[0]
-          if m in (0xcafebabe, 0xcafebabf):
-              for i in range(struct.unpack(">I", data[4:8])[0]):
-                  b = 8 + i*20
-                  scan(struct.unpack(">I", data[b+8:b+12])[0], "arch%d" % i)
-          else:
-              scan(0, "thin")
-          PYEOF
-          { echo "### cifrado"; python3 check.py freefireth; } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: dumper
         env:
           DOTNET_ROLL_FORWARD: Major
@@ -50,13 +23,21 @@ jobs:
           CMD="dotnet Il2CppDumper.dll $GITHUB_WORKSPACE/freefireth $GITHUB_WORKSPACE/global-metadata.dat $GITHUB_WORKSPACE/dump"
           printf '\n\n\n\n' | timeout 300 script -qec "$CMD" /dev/null > out.txt 2>&1
           CODE=$?
+          SRC=$(find "$GITHUB_WORKSPACE" -name dump.cs | head -1)
+          if [ -n "$SRC" ]; then
+            mkdir -p "$GITHUB_WORKSPACE/dump"
+            cp -r "$(dirname "$SRC")"/. "$GITHUB_WORKSPACE/dump/"
+          fi
           {
             echo "### dumper"
             echo "EXIT=$CODE"
-            echo "--- salida completa ---"
-            head -120 out.txt
-            echo "--- contenido de dump ---"
-            ls -la "$GITHUB_WORKSPACE/dump" 2>&1
+            head -20 out.txt
+            echo "--- localizado ---"
+            echo "$SRC"
+            echo "--- clases de interes ---"
+            grep -nE "class (Player|Match|Aim|CameraController|TargetHeuristic|Avatar|Weapon|Bone)[A-Za-z]*" "$GITHUB_WORKSPACE/dump/dump.cs" | head -80
+            echo "--- tamano ---"
+            ls -la "$GITHUB_WORKSPACE/dump" | head -20
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@v4
