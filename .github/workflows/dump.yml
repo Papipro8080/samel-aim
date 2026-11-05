@@ -25,24 +25,25 @@ jobs:
           cp "$(find "$GITHUB_WORKSPACE" -name dump.cs | head -1)" dump/dump.cs
           D="$GITHUB_WORKSPACE/dump/dump.cs"
           {
-            echo "### 1. clase que declara m_LocalPlayer"
-            awk 'NR>=467000 && NR<=468176 && /class /' "$D" | tail -3
-            echo "### 2. contexto de m_LocalPlayer"
-            sed -n '468140,468200p' "$D"
-            echo "### 3. listas de Player"
-            grep -nE "List<Player>|List<.*Player|Dictionary<[^>]*Player|Player\[\]" "$D" | head -30
-            echo "### 4. variantes de lista de jugadores"
-            grep -niE "m_players|m_allplayers|m_playerlist|m_playermap|m_playerdict|m_playerarray" "$D" | head -20
-            echo "### 5. cabecera de Player"
-            sed -n '471252,471400p' "$D"
-            echo "### 6. PlayerNetwork"
-            sed -n '479347,479430p' "$D"
-            echo "### 7. CameraControllerBase y Manager"
-            sed -n '423018,423230p' "$D"
-            echo "### 8. Heuristic"
-            grep -n "Heuristic" "$D" | head -20
-            echo "### 9. clases con Aim"
-            grep -nE "class [A-Za-z0-9_]*Aim[A-Za-z0-9_]*" "$D" | head -30
+            echo "### 1. COWGameBase"
+            sed -n '417825,417950p' "$D"
+            echo "### 2. MatchGame"
+            sed -n '419061,419300p' "$D"
+            echo "### 3. metodos GetPlayer / PlayerManager"
+            grep -nE "GetPlayer[A-Za-z]*\(|PlayerManager|m_PlayerDict|m_PlayerMap|m_EntityList|m_Entitys" "$D" | head -40
+            echo "### 4. contenedores de AttackableEntity"
+            grep -nE "List<AttackableEntity>|Dictionary<[^>]*AttackableEntity" "$D" | head -20
+            echo "### 5. AttackableEntity"
+            sed -n '422760,422850p' "$D"
+            echo "### 6. GINHBFJPFBP (m_AimAssist)"
+            awk '/class GINHBFJPFBP /{f=1;c=0} f&&c<80{print;c++}' "$D"
+            echo "### 7. EAimAssist"
+            awk '/class EAimAssist /{f=1;c=0} f&&c<80{print;c++}' "$D"
+            echo "### 8. HasHeuristicTarget / GetHeuristicTarget"
+            sed -n '471055,471080p' "$D"
+            sed -n '473455,473485p' "$D"
+            echo "### 9. vida y estado"
+            grep -nE "m_HP|GetHP|get_HP|IsDead|get_IsDead|IsAlive" "$D" | head -30
           } >> "$GITHUB_STEP_SUMMARY"
           exit 0
       - uses: actions/upload-artifact@v4
